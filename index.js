@@ -6,8 +6,8 @@ import http from "http";
 const createServer = () => {
   const server = new McpServer({
     name: "mcp-europe-tools",
-    version: "1.0.0",
-    description: "European data tools - NIF validation, IBAN validation, VAT rates, public holidays"
+    version: "1.1.0",
+    description: "European data tools - NIF validation, IBAN validation, VAT rates, public holidays, Spanish ID validation"
   });
 
   // ── FERRAMENTA 1: Validar NIF Português ──
@@ -96,7 +96,7 @@ const createServer = () => {
   server.tool(
     "get_portugal_holidays",
     "Returns Portuguese public holidays for a given year",
-    { year: z.number().describe("The year to get holidays for (e.g. 2025)") },
+    { year: z.number().describe("The year to get holidays for (e.g. 2026)") },
     async ({ year }) => {
       const holidays = [
         { date: `${year}-01-01`, name: "Ano Novo", name_en: "New Year's Day" },
@@ -139,6 +139,107 @@ const createServer = () => {
     }
   );
 
+  // ── FERRAMENTA 6: Validar NIF/NIE/CIF Espanhol ──
+  server.tool(
+    "validate_nif_es",
+    "Validates a Spanish NIF (DNI), NIE (foreigner ID) or CIF (company tax number)",
+    { id: z.string().describe("The Spanish NIF, NIE or CIF to validate") },
+    async ({ id }) => {
+      const clean = id.replace(/\s/g, "").toUpperCase();
+      const nifLetters = "TRWAGMYFPDXBNJZSQVHLCKE";
+      if (/^\d{8}[A-Z]$/.test(clean)) {
+        const number = parseInt(clean.slice(0, 8));
+        const letter = clean[8];
+        const expected = nifLetters[number % 23];
+        const valid = letter === expected;
+        return { content: [{ type: "text", text: JSON.stringify({ valid, type: "NIF", id: clean }) }] };
+      }
+      if (/^[XYZ]\d{7}[A-Z]$/.test(clean)) {
+        const nieMap = { X: "0", Y: "1", Z: "2" };
+        const replaced = nieMap[clean[0]] + clean.slice(1, 8);
+        const number = parseInt(replaced);
+        const letter = clean[8];
+        const expected = nifLetters[number % 23];
+        const valid = letter === expected;
+        return { content: [{ type: "text", text: JSON.stringify({ valid, type: "NIE", id: clean }) }] };
+      }
+      if (/^[ABCDEFGHJKLMNPQRSUVW]\d{7}[0-9A-J]$/.test(clean)) {
+        const letters = "JABCDEFGHI";
+        let sumOdd = 0;
+        let sumEven = 0;
+        for (let i = 1; i <= 7; i++) {
+          const digit = parseInt(clean[i]);
+          if (i % 2 === 0) {
+            sumEven += digit;
+          } else {
+            const doubled = digit * 2;
+            sumOdd += doubled > 9 ? doubled - 9 : doubled;
+          }
+        }
+        const total = sumOdd + sumEven;
+        const controlDigit = (10 - (total % 10)) % 10;
+        const controlLetter = letters[controlDigit];
+        const lastChar = clean[8];
+        const valid = lastChar === controlDigit.toString() || lastChar === controlLetter;
+        return { content: [{ type: "text", text: JSON.stringify({ valid, type: "CIF", id: clean }) }] };
+      }
+      return { content: [{ type: "text", text: JSON.stringify({ valid: false, reason: "Format not recognized. Expected NIF (8 digits + letter), NIE (X/Y/Z + 7 digits + letter) or CIF (letter + 7 digits + control)" }) }] };
+    }
+  );
+
+  // ── FERRAMENTA 7: Calcular Dias Úteis ──
+  server.tool(
+    "calculate_working_days",
+    "Calculates working days between two dates, excluding weekends and Portuguese public holidays",
+    {
+      start_date: z.string().describe("Start date in YYYY-MM-DD format"),
+      end_date: z.string().describe("End date in YYYY-MM-DD format")
+    },
+    async ({ start_date, end_date }) => {
+      const holidays = [
+        "01-01", "04-25", "05-01", "06-10",
+        "08-15", "10-05", "11-01", "12-01", "12-08", "12-25"
+      ];
+      const start = new Date(start_date);
+      const end = new Date(end_date);
+      if (isNaN(start) || isNaN(end)) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: "Invalid date format. Use YYYY-MM-DD" }) }] };
+      }
+      let count = 0;
+      const current = new Date(start);
+      while (current <= end) {
+        const dayOfWeek = current.getDay();
+        const mmdd = `${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`;
+        if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidays.includes(mmdd)) {
+          count++;
+        }
+        current.setDate(current.getDate() + 1);
+      }
+      return { content: [{ type: "text", text: JSON.stringify({ start_date, end_date, working_days: count }) }] };
+    }
+  );
+
+  // ── FERRAMENTA 8: Feriados Espanhóis ──
+  server.tool(
+    "get_spain_holidays",
+    "Returns Spanish national public holidays for a given year",
+    { year: z.number().describe("The year to get holidays for (e.g. 2026)") },
+    async ({ year }) => {
+      const holidays = [
+        { date: `${year}-01-01`, name: "Año Nuevo", name_en: "New Year's Day" },
+        { date: `${year}-01-06`, name: "Epifanía del Señor", name_en: "Epiphany" },
+        { date: `${year}-05-01`, name: "Fiesta del Trabajo", name_en: "Labour Day" },
+        { date: `${year}-08-15`, name: "Asunción de la Virgen", name_en: "Assumption of Mary" },
+        { date: `${year}-10-12`, name: "Fiesta Nacional de España", name_en: "Spanish National Day" },
+        { date: `${year}-11-01`, name: "Todos los Santos", name_en: "All Saints Day" },
+        { date: `${year}-12-06`, name: "Día de la Constitución Española", name_en: "Constitution Day" },
+        { date: `${year}-12-08`, name: "Inmaculada Concepción", name_en: "Immaculate Conception" },
+        { date: `${year}-12-25`, name: "Navidad", name_en: "Christmas Day" },
+      ];
+      return { content: [{ type: "text", text: JSON.stringify({ year, country: "Spain", holidays }) }] };
+    }
+  );
+
   return server;
 };
 
@@ -148,9 +249,9 @@ const httpServer = http.createServer(async (req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({
       name: "mcp-europe-tools",
-      version: "1.0.0",
+      version: "1.1.0",
       description: "European data tools for AI agents",
-      tools: ["validate_nif", "validate_iban", "get_vat_rate", "get_portugal_holidays", "format_number_european"],
+      tools: ["validate_nif", "validate_iban", "get_vat_rate", "get_portugal_holidays", "format_number_european", "validate_nif_es", "calculate_working_days", "get_spain_holidays"],
       mcp_endpoint: "/mcp"
     }));
     return;
