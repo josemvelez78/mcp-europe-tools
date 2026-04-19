@@ -169,7 +169,7 @@ const httpServer = http.createServer(async (req, res) => {
   res.end("Not found");
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 httpServer.listen(PORT, () => {
   console.log(`MCP Europe Tools server running on port ${PORT}`);
 });
