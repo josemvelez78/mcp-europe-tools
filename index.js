@@ -7,14 +7,14 @@ const createServer = () => {
   const server = new McpServer({
     name: "mcp-europe-tools",
     version: "1.1.0",
-    description: "European data tools - NIF validation, IBAN validation, VAT rates, public holidays, Spanish ID validation"
+    description: "Essential European data validation and formatting tools for AI agents working with Portuguese, Spanish and European business data. Covers NIF/NIE/CIF validation, IBAN verification, VAT rates, public holidays and number formatting for 18+ European countries."
   });
 
   // ── FERRAMENTA 1: Validar NIF Português ──
   server.tool(
     "validate_nif",
-    "Validates a Portuguese NIF (tax identification number)",
-    { nif: z.string().describe("The Portuguese NIF to validate") },
+    "Validates a Portuguese NIF (Número de Identificação Fiscal) using the official Portuguese Tax Authority checksum algorithm. Use this tool when processing Portuguese invoices, tax forms, user registrations, or any document requiring a valid Portuguese fiscal number. Input must be a 9-digit string. Returns whether the NIF is mathematically valid, along with the cleaned NIF. Does not verify if the NIF exists in the Tax Authority database — only validates the format and checksum.",
+    { nif: z.string().describe("The Portuguese NIF to validate. Can include spaces which will be stripped. Example: '123456789'") },
     async ({ nif }) => {
       const clean = nif.replace(/\s/g, "");
       if (!/^\d{9}$/.test(clean)) {
@@ -38,8 +38,8 @@ const createServer = () => {
   // ── FERRAMENTA 2: Validar IBAN ──
   server.tool(
     "validate_iban",
-    "Validates an IBAN number from any European country",
-    { iban: z.string().describe("The IBAN to validate") },
+    "Validates an IBAN (International Bank Account Number) for any European country using the official MOD-97 algorithm. Use this tool when processing bank transfers, payment forms, supplier registrations, or any financial document requiring a valid European bank account number. Supports all European countries including Portugal (PT), Spain (ES), France (FR), Germany (DE), Italy (IT), Netherlands (NL) and 12 more. Returns whether the IBAN is valid, the country code extracted from the IBAN, and the cleaned IBAN without spaces.",
+    { iban: z.string().describe("The IBAN to validate. Spaces are automatically removed. Example: 'PT50 0002 0123 1234 5678 9015 4'") },
     async ({ iban }) => {
       const clean = iban.replace(/\s/g, "").toUpperCase();
       if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(clean)) {
@@ -60,8 +60,8 @@ const createServer = () => {
   // ── FERRAMENTA 3: Taxas de IVA Europeias ──
   server.tool(
     "get_vat_rate",
-    "Returns the VAT rates for a European country",
-    { country_code: z.string().describe("Two-letter country code (e.g. PT, ES, FR, DE)") },
+    "Returns the current VAT (Value Added Tax) rates for any European Union country, including standard, reduced, intermediate and super-reduced rates where applicable. Use this tool when calculating prices, generating invoices, processing e-commerce transactions, or any task requiring accurate EU tax rates. Supports 18 EU countries: PT, ES, FR, DE, IT, NL, BE, PL, SE, DK, FI, AT, IE, GR, HU, RO, CZ, HR. Returns all applicable rates and the country name.",
+    { country_code: z.string().describe("Two-letter ISO country code. Example: 'PT' for Portugal, 'ES' for Spain, 'DE' for Germany") },
     async ({ country_code }) => {
       const rates = {
         PT: { standard: 23, intermediate: 13, reduced: 6, country: "Portugal" },
@@ -95,8 +95,8 @@ const createServer = () => {
   // ── FERRAMENTA 4: Feriados Portugueses ──
   server.tool(
     "get_portugal_holidays",
-    "Returns Portuguese public holidays for a given year",
-    { year: z.number().describe("The year to get holidays for (e.g. 2026)") },
+    "Returns the complete list of Portuguese national public holidays for any given year. Use this tool when calculating delivery dates, scheduling appointments, computing working days, or any task that requires knowing which days are non-working in Portugal. Returns all 10 mandatory national holidays with dates in YYYY-MM-DD format and names in both Portuguese and English. Note: does not include municipal holidays which vary by city.",
+    { year: z.number().describe("The year to get holidays for. Example: 2026") },
     async ({ year }) => {
       const holidays = [
         { date: `${year}-01-01`, name: "Ano Novo", name_en: "New Year's Day" },
@@ -110,18 +110,18 @@ const createServer = () => {
         { date: `${year}-12-08`, name: "Imaculada Conceição", name_en: "Immaculate Conception" },
         { date: `${year}-12-25`, name: "Natal", name_en: "Christmas Day" },
       ];
-      return { content: [{ type: "text", text: JSON.stringify({ year, country: "Portugal", holidays }) }] };
+      return { content: [{ type: "text", text: JSON.stringify({ year, country: "Portugal", total_holidays: holidays.length, holidays }) }] };
     }
   );
 
   // ── FERRAMENTA 5: Formatar Número Europeu ──
   server.tool(
     "format_number_european",
-    "Formats a number according to European locale conventions",
+    "Formats a number according to the locale conventions of a specific European country. Use this tool when displaying prices, quantities, measurements or any numeric value to end users in a specific European country. European countries use different decimal separators and thousand separators — for example Portugal uses '1.234,56' while the UK uses '1,234.56'. Supports PT, ES, FR, DE, IT, NL, BE, PL, SE, DK, FI, AT, IE, GR, HU, RO. Returns the formatted string, the locale used, and the original number.",
     {
-      number: z.number().describe("The number to format"),
-      country_code: z.string().describe("Country code for formatting (PT, ES, DE, FR, etc)"),
-      decimals: z.number().optional().describe("Number of decimal places (default 2)")
+      number: z.number().describe("The number to format. Example: 1234.56"),
+      country_code: z.string().describe("Two-letter country code for the target locale. Example: 'PT' for Portugal"),
+      decimals: z.number().optional().describe("Number of decimal places to show. Defaults to 2. Example: 0 for whole numbers, 2 for prices")
     },
     async ({ number, country_code, decimals = 2 }) => {
       const localeMap = {
@@ -142,8 +142,8 @@ const createServer = () => {
   // ── FERRAMENTA 6: Validar NIF/NIE/CIF Espanhol ──
   server.tool(
     "validate_nif_es",
-    "Validates a Spanish NIF (DNI), NIE (foreigner ID) or CIF (company tax number)",
-    { id: z.string().describe("The Spanish NIF, NIE or CIF to validate") },
+    "Validates Spanish tax identification numbers including NIF (DNI for Spanish citizens, 8 digits + letter), NIE (Número de Identidad de Extranjero for foreigners, starts with X/Y/Z) and CIF (Código de Identificación Fiscal for companies, starts with a letter). Use this tool when processing Spanish invoices, tax forms, user registrations, e-commerce orders, or any document requiring a valid Spanish fiscal identifier. Returns the document type detected (NIF, NIE or CIF), whether it is valid, and the cleaned identifier.",
+    { id: z.string().describe("The Spanish NIF, NIE or CIF to validate. Spaces are automatically removed. Examples: '12345678Z' for NIF, 'X1234567L' for NIE, 'B12345678' for CIF") },
     async ({ id }) => {
       const clean = id.replace(/\s/g, "").toUpperCase();
       const nifLetters = "TRWAGMYFPDXBNJZSQVHLCKE";
@@ -190,10 +190,10 @@ const createServer = () => {
   // ── FERRAMENTA 7: Calcular Dias Úteis ──
   server.tool(
     "calculate_working_days",
-    "Calculates working days between two dates, excluding weekends and Portuguese public holidays",
+    "Calculates the number of working days between two dates, excluding weekends (Saturday and Sunday) and all Portuguese national public holidays. Use this tool when calculating invoice payment deadlines, project delivery dates, legal notice periods, SLA calculations, or any business process that operates on Portuguese working days. Input dates must be in YYYY-MM-DD format. Returns the count of working days and the start/end dates used.",
     {
-      start_date: z.string().describe("Start date in YYYY-MM-DD format"),
-      end_date: z.string().describe("End date in YYYY-MM-DD format")
+      start_date: z.string().describe("Start date in YYYY-MM-DD format. Example: '2026-01-01'"),
+      end_date: z.string().describe("End date in YYYY-MM-DD format. Example: '2026-01-31'")
     },
     async ({ start_date, end_date }) => {
       const holidays = [
@@ -222,8 +222,8 @@ const createServer = () => {
   // ── FERRAMENTA 8: Feriados Espanhóis ──
   server.tool(
     "get_spain_holidays",
-    "Returns Spanish national public holidays for a given year",
-    { year: z.number().describe("The year to get holidays for (e.g. 2026)") },
+    "Returns the complete list of Spanish national public holidays for any given year. Use this tool when calculating delivery dates, scheduling appointments, computing working days, or any task that requires knowing which days are non-working in Spain. Returns all national holidays with dates in YYYY-MM-DD format and names in both Spanish and English. Note: Spain also has regional holidays that vary by autonomous community (Catalonia, Madrid, etc.) which are not included here.",
+    { year: z.number().describe("The year to get holidays for. Example: 2026") },
     async ({ year }) => {
       const holidays = [
         { date: `${year}-01-01`, name: "Año Nuevo", name_en: "New Year's Day" },
@@ -236,7 +236,7 @@ const createServer = () => {
         { date: `${year}-12-08`, name: "Inmaculada Concepción", name_en: "Immaculate Conception" },
         { date: `${year}-12-25`, name: "Navidad", name_en: "Christmas Day" },
       ];
-      return { content: [{ type: "text", text: JSON.stringify({ year, country: "Spain", holidays }) }] };
+      return { content: [{ type: "text", text: JSON.stringify({ year, country: "Spain", total_holidays: holidays.length, holidays }) }] };
     }
   );
 
