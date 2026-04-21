@@ -1,5 +1,7 @@
 # MCP Europe Tools
 
+[![smithery badge](https://smithery.ai/badge/josemvelez/mcp-europe-tools)](https://smithery.ai/servers/josemvelez/mcp-europe-tools)
+
 European data validation and formatting tools for AI agents.
 
 ## Overview
