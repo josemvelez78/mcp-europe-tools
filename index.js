@@ -2,19 +2,20 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import http from "http";
-
+ 
 const createServer = () => {
   const server = new McpServer({
     name: "mcp-europe-tools",
     version: "1.1.0",
     description: "Essential European data validation and formatting tools for AI agents working with Portuguese, Spanish and European business data. Covers NIF/NIE/CIF validation, IBAN verification, VAT rates, public holidays and number formatting for 18+ European countries."
   });
-
+ 
   // ── FERRAMENTA 1: Validar NIF Português ──
   server.tool(
     "validate_nif",
     "Validates a Portuguese NIF (Número de Identificação Fiscal) using the official Portuguese Tax Authority checksum algorithm. Use this tool when processing Portuguese invoices, tax forms, user registrations, or any document requiring a valid Portuguese fiscal number. Input must be a 9-digit string. Returns whether the NIF is mathematically valid, along with the cleaned NIF. Does not verify if the NIF exists in the Tax Authority database — only validates the format and checksum.",
     { nif: z.string().describe("The Portuguese NIF to validate. Can include spaces which will be stripped. Example: '123456789'") },
+    { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     async ({ nif }) => {
       const clean = nif.replace(/\s/g, "");
       if (!/^\d{9}$/.test(clean)) {
@@ -34,12 +35,13 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify({ valid, nif: clean }) }] };
     }
   );
-
+ 
   // ── FERRAMENTA 2: Validar IBAN ──
   server.tool(
     "validate_iban",
     "Validates an IBAN (International Bank Account Number) for any European country using the official MOD-97 algorithm. Use this tool when processing bank transfers, payment forms, supplier registrations, or any financial document requiring a valid European bank account number. Supports all European countries including Portugal (PT), Spain (ES), France (FR), Germany (DE), Italy (IT), Netherlands (NL) and 12 more. Returns whether the IBAN is valid, the country code extracted from the IBAN, and the cleaned IBAN without spaces.",
     { iban: z.string().describe("The IBAN to validate. Spaces are automatically removed. Example: 'PT50 0002 0123 1234 5678 9015 4'") },
+    { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     async ({ iban }) => {
       const clean = iban.replace(/\s/g, "").toUpperCase();
       if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(clean)) {
@@ -56,12 +58,13 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify({ valid, country, iban: clean }) }] };
     }
   );
-
+ 
   // ── FERRAMENTA 3: Taxas de IVA Europeias ──
   server.tool(
     "get_vat_rate",
     "Returns the current VAT (Value Added Tax) rates for any European Union country, including standard, reduced, intermediate and super-reduced rates where applicable. Use this tool when calculating prices, generating invoices, processing e-commerce transactions, or any task requiring accurate EU tax rates. Supports 18 EU countries: PT, ES, FR, DE, IT, NL, BE, PL, SE, DK, FI, AT, IE, GR, HU, RO, CZ, HR. Returns all applicable rates and the country name.",
     { country_code: z.string().describe("Two-letter ISO country code. Example: 'PT' for Portugal, 'ES' for Spain, 'DE' for Germany") },
+    { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     async ({ country_code }) => {
       const rates = {
         PT: { standard: 23, intermediate: 13, reduced: 6, country: "Portugal" },
@@ -91,12 +94,13 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify(data) }] };
     }
   );
-
+ 
   // ── FERRAMENTA 4: Feriados Portugueses ──
   server.tool(
     "get_portugal_holidays",
     "Returns the complete list of Portuguese national public holidays for any given year. Use this tool when calculating delivery dates, scheduling appointments, computing working days, or any task that requires knowing which days are non-working in Portugal. Returns all 10 mandatory national holidays with dates in YYYY-MM-DD format and names in both Portuguese and English. Note: does not include municipal holidays which vary by city.",
     { year: z.number().describe("The year to get holidays for. Example: 2026") },
+    { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     async ({ year }) => {
       const holidays = [
         { date: `${year}-01-01`, name: "Ano Novo", name_en: "New Year's Day" },
@@ -113,7 +117,7 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify({ year, country: "Portugal", total_holidays: holidays.length, holidays }) }] };
     }
   );
-
+ 
   // ── FERRAMENTA 5: Formatar Número Europeu ──
   server.tool(
     "format_number_european",
@@ -123,6 +127,7 @@ const createServer = () => {
       country_code: z.string().describe("Two-letter country code for the target locale. Example: 'PT' for Portugal"),
       decimals: z.number().optional().describe("Number of decimal places to show. Defaults to 2. Example: 0 for whole numbers, 2 for prices")
     },
+    { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     async ({ number, country_code, decimals = 2 }) => {
       const localeMap = {
         PT: "pt-PT", ES: "es-ES", FR: "fr-FR", DE: "de-DE",
@@ -138,12 +143,13 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify({ original: number, formatted, locale, country_code }) }] };
     }
   );
-
+ 
   // ── FERRAMENTA 6: Validar NIF/NIE/CIF Espanhol ──
   server.tool(
     "validate_nif_es",
     "Validates Spanish tax identification numbers including NIF (DNI for Spanish citizens, 8 digits + letter), NIE (Número de Identidad de Extranjero for foreigners, starts with X/Y/Z) and CIF (Código de Identificación Fiscal for companies, starts with a letter). Use this tool when processing Spanish invoices, tax forms, user registrations, e-commerce orders, or any document requiring a valid Spanish fiscal identifier. Returns the document type detected (NIF, NIE or CIF), whether it is valid, and the cleaned identifier.",
     { id: z.string().describe("The Spanish NIF, NIE or CIF to validate. Spaces are automatically removed. Examples: '12345678Z' for NIF, 'X1234567L' for NIE, 'B12345678' for CIF") },
+    { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     async ({ id }) => {
       const clean = id.replace(/\s/g, "").toUpperCase();
       const nifLetters = "TRWAGMYFPDXBNJZSQVHLCKE";
@@ -186,7 +192,7 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify({ valid: false, reason: "Format not recognized. Expected NIF (8 digits + letter), NIE (X/Y/Z + 7 digits + letter) or CIF (letter + 7 digits + control)" }) }] };
     }
   );
-
+ 
   // ── FERRAMENTA 7: Calcular Dias Úteis ──
   server.tool(
     "calculate_working_days",
@@ -195,6 +201,7 @@ const createServer = () => {
       start_date: z.string().describe("Start date in YYYY-MM-DD format. Example: '2026-01-01'"),
       end_date: z.string().describe("End date in YYYY-MM-DD format. Example: '2026-01-31'")
     },
+    { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     async ({ start_date, end_date }) => {
       const holidays = [
         "01-01", "04-25", "05-01", "06-10",
@@ -218,12 +225,13 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify({ start_date, end_date, working_days: count }) }] };
     }
   );
-
+ 
   // ── FERRAMENTA 8: Feriados Espanhóis ──
   server.tool(
     "get_spain_holidays",
     "Returns the complete list of Spanish national public holidays for any given year. Use this tool when calculating delivery dates, scheduling appointments, computing working days, or any task that requires knowing which days are non-working in Spain. Returns all national holidays with dates in YYYY-MM-DD format and names in both Spanish and English. Note: Spain also has regional holidays that vary by autonomous community (Catalonia, Madrid, etc.) which are not included here.",
     { year: z.number().describe("The year to get holidays for. Example: 2026") },
+    { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     async ({ year }) => {
       const holidays = [
         { date: `${year}-01-01`, name: "Año Nuevo", name_en: "New Year's Day" },
@@ -239,10 +247,10 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify({ year, country: "Spain", total_holidays: holidays.length, holidays }) }] };
     }
   );
-
+ 
   return server;
 };
-
+ 
 // ── Servidor HTTP ──
 const httpServer = http.createServer(async (req, res) => {
   if (req.method === "GET" && req.url === "/") {
@@ -256,7 +264,7 @@ const httpServer = http.createServer(async (req, res) => {
     }));
     return;
   }
-
+ 
   if (req.url === "/mcp") {
     const server = createServer();
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
@@ -265,11 +273,11 @@ const httpServer = http.createServer(async (req, res) => {
     await transport.handleRequest(req, res);
     return;
   }
-
+ 
   res.writeHead(404);
   res.end("Not found");
 });
-
+ 
 const PORT = process.env.PORT || 8080;
 httpServer.listen(PORT, () => {
   console.log(`MCP Europe Tools server running on port ${PORT}`);
