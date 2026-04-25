@@ -2,14 +2,14 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import http from "http";
- 
+
 const createServer = () => {
   const server = new McpServer({
     name: "mcp-europe-tools",
-    version: "1.1.0",
-    description: "Essential European data validation and formatting tools for AI agents working with Portuguese, Spanish and European business data. Covers NIF/NIE/CIF validation, IBAN verification, VAT rates, public holidays and number formatting for 18+ European countries."
+    version: "1.2.0",
+    description: "Essential European data validation and formatting tools for AI agents working with Portuguese, Spanish, French and European business data. Covers NIF/NIE/CIF validation, SIRET/TVA validation, IBAN verification, VAT rates, public holidays and number formatting for 18+ European countries."
   });
- 
+
   // ── FERRAMENTA 1: Validar NIF Português ──
   server.registerTool(
     "validate_nif",
@@ -37,7 +37,7 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify({ valid, nif: clean }) }] };
     }
   );
- 
+
   // ── FERRAMENTA 2: Validar IBAN ──
   server.registerTool(
     "validate_iban",
@@ -62,7 +62,7 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify({ valid, country, iban: clean }) }] };
     }
   );
- 
+
   // ── FERRAMENTA 3: Taxas de IVA Europeias ──
   server.registerTool(
     "get_vat_rate",
@@ -100,7 +100,7 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify(data) }] };
     }
   );
- 
+
   // ── FERRAMENTA 4: Feriados Portugueses ──
   server.registerTool(
     "get_portugal_holidays",
@@ -125,7 +125,7 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify({ year, country: "Portugal", total_holidays: holidays.length, holidays }) }] };
     }
   );
- 
+
   // ── FERRAMENTA 5: Formatar Número Europeu ──
   server.registerTool(
     "format_number_european",
@@ -153,7 +153,7 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify({ original: number, formatted, locale, country_code }) }] };
     }
   );
- 
+
   // ── FERRAMENTA 6: Validar NIF/NIE/CIF Espanhol ──
   server.registerTool(
     "validate_nif_es",
@@ -204,7 +204,7 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify({ valid: false, reason: "Format not recognized. Expected NIF (8 digits + letter), NIE (X/Y/Z + 7 digits + letter) or CIF (letter + 7 digits + control)" }) }] };
     }
   );
- 
+
   // ── FERRAMENTA 7: Calcular Dias Úteis ──
   server.registerTool(
     "calculate_working_days",
@@ -239,7 +239,7 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify({ start_date, end_date, working_days: count }) }] };
     }
   );
- 
+
   // ── FERRAMENTA 8: Feriados Espanhóis ──
   server.registerTool(
     "get_spain_holidays",
@@ -263,24 +263,148 @@ const createServer = () => {
       return { content: [{ type: "text", text: JSON.stringify({ year, country: "Spain", total_holidays: holidays.length, holidays }) }] };
     }
   );
- 
+
+  // ── FERRAMENTA 9: Validar SIRET Francês ──
+  server.registerTool(
+    "validate_siret",
+    {
+      description: "Validates a French SIRET (Système d'Identification du Répertoire des Établissements) number using the official Luhn algorithm. SIRET is a 14-digit identifier assigned to each business establishment in France. The first 9 digits form the SIREN (company identifier) and the last 5 digits identify the specific establishment. Use this tool when processing French invoices, supplier registrations, B2B transactions, or any document requiring a valid French business establishment identifier. Returns whether the SIRET is valid, the SIREN extracted, and the establishment code.",
+      inputSchema: { siret: z.string().describe("The French SIRET to validate. Spaces and dashes are automatically removed. Example: '732 829 320 00074' or '73282932000074'") },
+      annotations: { title: "Validate French SIRET", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+    },
+    async ({ siret }) => {
+      const clean = siret.replace(/[\s\-]/g, "");
+      if (!/^\d{14}$/.test(clean)) {
+        return { content: [{ type: "text", text: JSON.stringify({ valid: false, reason: "SIRET must have exactly 14 digits" }) }] };
+      }
+
+      // Special case: La Poste SIRET (all digits sum must be divisible by 5)
+      if (clean.startsWith("356000000")) {
+        const sum = clean.split("").reduce((acc, d) => acc + parseInt(d), 0);
+        const valid = sum % 5 === 0;
+        return { content: [{ type: "text", text: JSON.stringify({ valid, siren: clean.substring(0, 9), establishment: clean.substring(9), siret: clean }) }] };
+      }
+
+      // Standard Luhn algorithm
+      let sum = 0;
+      for (let i = 0; i < 14; i++) {
+        let digit = parseInt(clean[i]);
+        if (i % 2 === 0) {
+          digit *= 2;
+          if (digit > 9) digit -= 9;
+        }
+        sum += digit;
+      }
+      const valid = sum % 10 === 0;
+      const siren = clean.substring(0, 9);
+      const establishment = clean.substring(9);
+      return { content: [{ type: "text", text: JSON.stringify({ valid, siren, establishment, siret: clean }) }] };
+    }
+  );
+
+  // ── FERRAMENTA 10: Validar Número TVA Francês ──
+  server.registerTool(
+    "validate_tva_fr",
+    {
+      description: "Validates a French TVA (Taxe sur la Valeur Ajoutée) number, also known as French VAT number. The French TVA number consists of the prefix 'FR' followed by 2 alphanumeric characters and 9 digits (the SIREN). Use this tool when processing French invoices, validating supplier VAT numbers, or any cross-border EU transaction involving French companies. Returns whether the TVA number is valid, the SIREN extracted, and the key digits.",
+      inputSchema: { tva: z.string().describe("The French TVA number to validate. Spaces are automatically removed. Example: 'FR 40 303 265 045' or 'FR40303265045'") },
+      annotations: { title: "Validate French TVA Number", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+    },
+    async ({ tva }) => {
+      const clean = tva.replace(/\s/g, "").toUpperCase();
+
+      // Format: FR + 2 alphanumeric + 9 digits
+      if (!/^FR[A-Z0-9]{2}\d{9}$/.test(clean)) {
+        return { content: [{ type: "text", text: JSON.stringify({ valid: false, reason: "French TVA must start with FR followed by 2 alphanumeric characters and 9 digits. Example: FR40303265045" }) }] };
+      }
+
+      const key = clean.substring(2, 4);
+      const siren = clean.substring(4);
+
+      // If key is numeric, validate using official formula: key = (12 + 3 * (SIREN % 97)) % 97
+      if (/^\d{2}$/.test(key)) {
+        const expectedKey = (12 + 3 * (parseInt(siren) % 97)) % 97;
+        const valid = parseInt(key) === expectedKey;
+        return { content: [{ type: "text", text: JSON.stringify({ valid, key, siren, tva: clean }) }] };
+      }
+
+      // Alphanumeric key — format is valid but checksum not verifiable
+      return { content: [{ type: "text", text: JSON.stringify({ valid: true, key, siren, tva: clean, note: "Alphanumeric key — format valid, checksum not applicable" }) }] };
+    }
+  );
+
+  // ── FERRAMENTA 11: Feriados Franceses ──
+  server.registerTool(
+    "get_france_holidays",
+    {
+      description: "Returns French national public holidays for any given year. Use this tool when calculating delivery dates, scheduling appointments, computing working days, or any task requiring knowledge of non-working days in France. Returns all 11 national holidays with dates in YYYY-MM-DD format and names in both French and English. Note: Easter-dependent holidays (Easter Monday, Ascension, Whit Monday) are calculated for the given year.",
+      inputSchema: { year: z.number().describe("The year to get holidays for. Example: 2026") },
+      annotations: { title: "Get France Holidays", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+    },
+    async ({ year }) => {
+      // Calculate Easter Sunday using the Anonymous Gregorian algorithm
+      const a = year % 19;
+      const b = Math.floor(year / 100);
+      const c = year % 100;
+      const d = Math.floor(b / 4);
+      const e = b % 4;
+      const f = Math.floor((b + 8) / 25);
+      const g = Math.floor((b - f + 1) / 3);
+      const h = (19 * a + b - d - g + 15) % 30;
+      const i = Math.floor(c / 4);
+      const k = c % 4;
+      const l = (32 + 2 * e + 2 * i - h - k) % 7;
+      const m = Math.floor((a + 11 * h + 22 * l) / 451);
+      const month = Math.floor((h + l - 7 * m + 114) / 31);
+      const day = ((h + l - 7 * m + 114) % 31) + 1;
+      const easter = new Date(year, month - 1, day);
+
+      const addDays = (date, days) => {
+        const d = new Date(date);
+        d.setDate(d.getDate() + days);
+        return d;
+      };
+      const fmt = (d) => d.toISOString().split("T")[0];
+
+      const easterMonday = addDays(easter, 1);
+      const ascension = addDays(easter, 39);
+      const whitMonday = addDays(easter, 50);
+
+      const holidays = [
+        { date: `${year}-01-01`, name: "Jour de l'An", name_en: "New Year's Day" },
+        { date: fmt(easterMonday), name: "Lundi de Pâques", name_en: "Easter Monday" },
+        { date: `${year}-05-01`, name: "Fête du Travail", name_en: "Labour Day" },
+        { date: `${year}-05-08`, name: "Victoire 1945", name_en: "Victory in Europe Day" },
+        { date: fmt(ascension), name: "Ascension", name_en: "Ascension Day" },
+        { date: fmt(whitMonday), name: "Lundi de Pentecôte", name_en: "Whit Monday" },
+        { date: `${year}-07-14`, name: "Fête Nationale", name_en: "Bastille Day" },
+        { date: `${year}-08-15`, name: "Assomption", name_en: "Assumption of Mary" },
+        { date: `${year}-11-01`, name: "Toussaint", name_en: "All Saints Day" },
+        { date: `${year}-11-11`, name: "Armistice", name_en: "Armistice Day" },
+        { date: `${year}-12-25`, name: "Noël", name_en: "Christmas Day" },
+      ];
+
+      return { content: [{ type: "text", text: JSON.stringify({ year, country: "France", total_holidays: holidays.length, holidays }) }] };
+    }
+  );
+
   return server;
 };
- 
+
 // ── Servidor HTTP ──
 const httpServer = http.createServer(async (req, res) => {
   if (req.method === "GET" && req.url === "/") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({
       name: "mcp-europe-tools",
-      version: "1.1.0",
+      version: "1.2.0",
       description: "European data tools for AI agents",
-      tools: ["validate_nif", "validate_iban", "get_vat_rate", "get_portugal_holidays", "format_number_european", "validate_nif_es", "calculate_working_days", "get_spain_holidays"],
+      tools: ["validate_nif", "validate_iban", "get_vat_rate", "get_portugal_holidays", "format_number_european", "validate_nif_es", "calculate_working_days", "get_spain_holidays", "validate_siret", "validate_tva_fr", "get_france_holidays"],
       mcp_endpoint: "/mcp"
     }));
     return;
   }
- 
+
   if (req.url === "/mcp") {
     const server = createServer();
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
@@ -289,11 +413,11 @@ const httpServer = http.createServer(async (req, res) => {
     await transport.handleRequest(req, res);
     return;
   }
- 
+
   res.writeHead(404);
   res.end("Not found");
 });
- 
+
 const PORT = process.env.PORT || 8080;
 httpServer.listen(PORT, () => {
   console.log(`MCP Europe Tools server running on port ${PORT}`);
