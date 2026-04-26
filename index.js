@@ -6,7 +6,7 @@ import http from "http";
 const createServer = () => {
   const server = new McpServer({
     name: "mcp-europe-tools",
-    version: "1.2.0",
+    version: "1.2.1",
     description: "Essential European data validation and formatting tools for AI agents working with Portuguese, Spanish, French and European business data. Covers NIF/NIE/CIF validation, SIRET/TVA validation, IBAN verification, VAT rates, public holidays and number formatting for 18+ European countries."
   });
 
@@ -14,8 +14,8 @@ const createServer = () => {
   server.registerTool(
     "validate_nif",
     {
-      description: "Validates a Portuguese NIF (Número de Identificação Fiscal) using the official Portuguese Tax Authority checksum algorithm. Use this tool when processing Portuguese invoices, tax forms, user registrations, or any document requiring a valid Portuguese fiscal number. Input must be a 9-digit string. Returns whether the NIF is mathematically valid, along with the cleaned NIF. Does not verify if the NIF exists in the Tax Authority database — only validates the format and checksum.",
-      inputSchema: { nif: z.string().describe("The Portuguese NIF to validate. Can include spaces which will be stripped. Example: '123456789'") },
+      description: "Validates a Portuguese NIF (Número de Identificação Fiscal) — the individual or company tax identification number issued by the Portuguese Tax Authority (AT). Uses the official modulo-11 checksum algorithm. Returns { valid: boolean, nif: string } on success, or { valid: false, reason: string } on format error. Use when processing Portuguese invoices (faturas), supplier onboarding, user registrations, or any compliance workflow requiring a verified Portuguese fiscal number. Does not query the AT database — validates format and checksum only.",
+      inputSchema: { nif: z.string().describe("9-digit Portuguese NIF, with or without spaces. Example: '123456789' or '123 456 789'") },
       annotations: { title: "Validate Portuguese NIF", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
     },
     async ({ nif }) => {
@@ -42,8 +42,8 @@ const createServer = () => {
   server.registerTool(
     "validate_iban",
     {
-      description: "Validates an IBAN (International Bank Account Number) for any European country using the official MOD-97 algorithm. Use this tool when processing bank transfers, payment forms, supplier registrations, or any financial document requiring a valid European bank account number. Supports all European countries including Portugal (PT), Spain (ES), France (FR), Germany (DE), Italy (IT), Netherlands (NL) and 12 more. Returns whether the IBAN is valid, the country code extracted from the IBAN, and the cleaned IBAN without spaces.",
-      inputSchema: { iban: z.string().describe("The IBAN to validate. Spaces are automatically removed. Example: 'PT50 0002 0123 1234 5678 9015 4'") },
+      description: "Validates an IBAN (International Bank Account Number) using the official ISO 13616 MOD-97 algorithm. Supports all European IBANs including PT, ES, FR, DE, IT, NL, BE, PL, SE, DK, FI, AT, IE, GR, HU, RO, CZ, HR. Returns { valid: boolean, country: string, iban: string } — the country code is extracted from the first two characters. Use when processing bank transfers, validating supplier payment details, SEPA direct debits, or any financial document requiring a verified bank account number. Spaces in the input are automatically removed.",
+      inputSchema: { iban: z.string().describe("European IBAN with or without spaces. Example: 'PT50 0002 0123 1234 5678 9015 4' or 'PT50000201231234567890154'") },
       annotations: { title: "Validate IBAN", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
     },
     async ({ iban }) => {
@@ -67,8 +67,8 @@ const createServer = () => {
   server.registerTool(
     "get_vat_rate",
     {
-      description: "Returns the current VAT (Value Added Tax) rates for any European Union country, including standard, reduced, intermediate and super-reduced rates where applicable. Use this tool when calculating prices, generating invoices, processing e-commerce transactions, or any task requiring accurate EU tax rates. Supports 18 EU countries: PT, ES, FR, DE, IT, NL, BE, PL, SE, DK, FI, AT, IE, GR, HU, RO, CZ, HR. Returns all applicable rates and the country name.",
-      inputSchema: { country_code: z.string().describe("Two-letter ISO country code. Example: 'PT' for Portugal, 'ES' for Spain, 'DE' for Germany") },
+      description: "Returns all VAT (Value Added Tax) rates for a given EU country — standard, reduced, intermediate, and super-reduced rates where applicable. Returns { standard, reduced, intermediate?, superreduced?, country } with rates as percentages. Supports 18 EU countries: PT, ES, FR, DE, IT, NL, BE, PL, SE, DK, FI, AT, IE, GR, HU, RO, CZ, HR. Use when generating invoices, calculating cross-border EU prices, determining correct tax rates for e-commerce checkout, or any compliance workflow requiring accurate EU VAT rates.",
+      inputSchema: { country_code: z.string().describe("Two-letter ISO 3166-1 alpha-2 country code. Example: 'PT' for Portugal, 'FR' for France, 'DE' for Germany") },
       annotations: { title: "Get EU VAT Rate", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
     },
     async ({ country_code }) => {
@@ -105,9 +105,9 @@ const createServer = () => {
   server.registerTool(
     "get_portugal_holidays",
     {
-      description: "Returns the complete list of Portuguese national public holidays for any given year. Use this tool when calculating delivery dates, scheduling appointments, computing working days, or any task that requires knowing which days are non-working in Portugal. Returns all 10 mandatory national holidays with dates in YYYY-MM-DD format and names in both Portuguese and English. Note: does not include municipal holidays which vary by city.",
-      inputSchema: { year: z.number().describe("The year to get holidays for. Example: 2026") },
-      annotations: { title: "Get Portugal Holidays", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+      description: "Returns all Portuguese national public holidays for a given year as a structured list. Each holiday includes { date: 'YYYY-MM-DD', name: string, name_en: string }. Returns 10 mandatory national holidays defined by Portuguese law. Use when calculating business deadlines, delivery dates, payment due dates, SLA periods, or scheduling tasks that must avoid non-working days in Portugal. Does not include municipal or regional holidays (e.g. Lisbon June 13, Porto June 24) which vary by city.",
+      inputSchema: { year: z.number().describe("Calendar year as a 4-digit integer. Example: 2026") },
+      annotations: { title: "Get Portugal Public Holidays", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
     },
     async ({ year }) => {
       const holidays = [
@@ -130,13 +130,13 @@ const createServer = () => {
   server.registerTool(
     "format_number_european",
     {
-      description: "Formats a number according to the locale conventions of a specific European country. Use this tool when displaying prices, quantities, measurements or any numeric value to end users in a specific European country. European countries use different decimal separators and thousand separators — for example Portugal uses '1.234,56' while the UK uses '1,234.56'. Supports PT, ES, FR, DE, IT, NL, BE, PL, SE, DK, FI, AT, IE, GR, HU, RO. Returns the formatted string, the locale used, and the original number.",
+      description: "Formats a number using the locale conventions of a specific European country, applying the correct decimal separator and thousands separator. Returns { original: number, formatted: string, locale: string, country_code: string }. Different European countries use different conventions — Portugal and most of continental Europe use '1.234,56' (dot as thousands, comma as decimal), while Ireland uses '1,234.56'. Supports PT, ES, FR, DE, IT, NL, BE, PL, SE, DK, FI, AT, IE, GR, HU, RO. Use when displaying prices, measurements, or any numeric value to end users in a specific European country.",
       inputSchema: {
-        number: z.number().describe("The number to format. Example: 1234.56"),
-        country_code: z.string().describe("Two-letter country code for the target locale. Example: 'PT' for Portugal"),
-        decimals: z.number().optional().describe("Number of decimal places to show. Defaults to 2. Example: 0 for whole numbers, 2 for prices")
+        number: z.number().describe("The numeric value to format. Example: 1234.56"),
+        country_code: z.string().describe("Two-letter country code for the target locale. Example: 'PT', 'FR', 'DE'"),
+        decimals: z.number().optional().describe("Number of decimal places. Defaults to 2. Use 0 for whole numbers, 2 for prices.")
       },
-      annotations: { title: "Format European Number", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+      annotations: { title: "Format Number European Locale", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
     },
     async ({ number, country_code, decimals = 2 }) => {
       const localeMap = {
@@ -158,9 +158,9 @@ const createServer = () => {
   server.registerTool(
     "validate_nif_es",
     {
-      description: "Validates Spanish tax identification numbers including NIF (DNI for Spanish citizens, 8 digits + letter), NIE (Número de Identidad de Extranjero for foreigners, starts with X/Y/Z) and CIF (Código de Identificación Fiscal for companies, starts with a letter). Use this tool when processing Spanish invoices, tax forms, user registrations, e-commerce orders, or any document requiring a valid Spanish fiscal identifier. Returns the document type detected (NIF, NIE or CIF), whether it is valid, and the cleaned identifier.",
-      inputSchema: { id: z.string().describe("The Spanish NIF, NIE or CIF to validate. Spaces are automatically removed. Examples: '12345678Z' for NIF, 'X1234567L' for NIE, 'B12345678' for CIF") },
-      annotations: { title: "Validate Spanish NIF/NIE/CIF", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+      description: "Validates Spanish tax identification numbers — NIF (DNI, 8 digits + check letter, for Spanish citizens), NIE (Número de Identidad de Extranjero, starts with X/Y/Z, for foreign residents), and CIF (Código de Identificación Fiscal, letter + 7 digits + control, for companies). Automatically detects the document type. Returns { valid: boolean, type: 'NIF'|'NIE'|'CIF', id: string }. Use when processing Spanish invoices, e-commerce orders, supplier registrations, or any document requiring a verified Spanish fiscal identifier.",
+      inputSchema: { id: z.string().describe("Spanish NIF, NIE or CIF with or without spaces. Examples: '12345678Z' (NIF), 'X1234567L' (NIE), 'B12345678' (CIF)") },
+      annotations: { title: "Validate Spanish NIF / NIE / CIF", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
     },
     async ({ id }) => {
       const clean = id.replace(/\s/g, "").toUpperCase();
@@ -209,12 +209,12 @@ const createServer = () => {
   server.registerTool(
     "calculate_working_days",
     {
-      description: "Calculates the number of working days between two dates, excluding weekends (Saturday and Sunday) and all Portuguese national public holidays. Use this tool when calculating invoice payment deadlines, project delivery dates, legal notice periods, SLA calculations, or any business process that operates on Portuguese working days. Input dates must be in YYYY-MM-DD format. Returns the count of working days and the start/end dates used.",
+      description: "Counts the number of working days between two dates (inclusive), excluding Saturdays, Sundays, and all 10 Portuguese national public holidays. Returns { start_date, end_date, working_days: number }. Use when calculating Portuguese invoice payment deadlines (30/60/90 days), legal notice periods, project milestones, SLA response times, or any business process governed by Portuguese working days. Input dates must be in YYYY-MM-DD format.",
       inputSchema: {
-        start_date: z.string().describe("Start date in YYYY-MM-DD format. Example: '2026-01-01'"),
-        end_date: z.string().describe("End date in YYYY-MM-DD format. Example: '2026-01-31'")
+        start_date: z.string().describe("Start date in YYYY-MM-DD format, inclusive. Example: '2026-01-01'"),
+        end_date: z.string().describe("End date in YYYY-MM-DD format, inclusive. Example: '2026-01-31'")
       },
-      annotations: { title: "Calculate Working Days", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+      annotations: { title: "Calculate Portuguese Working Days", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
     },
     async ({ start_date, end_date }) => {
       const holidays = [
@@ -244,9 +244,9 @@ const createServer = () => {
   server.registerTool(
     "get_spain_holidays",
     {
-      description: "Returns the complete list of Spanish national public holidays for any given year. Use this tool when calculating delivery dates, scheduling appointments, computing working days, or any task that requires knowing which days are non-working in Spain. Returns all national holidays with dates in YYYY-MM-DD format and names in both Spanish and English. Note: Spain also has regional holidays that vary by autonomous community (Catalonia, Madrid, etc.) which are not included here.",
-      inputSchema: { year: z.number().describe("The year to get holidays for. Example: 2026") },
-      annotations: { title: "Get Spain Holidays", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+      description: "Returns all Spanish national public holidays for a given year as a structured list. Each holiday includes { date: 'YYYY-MM-DD', name: string, name_en: string }. Returns 9 mandatory national holidays defined by Spanish law. Use when calculating business deadlines, delivery dates, or scheduling tasks that must avoid non-working days in Spain. Does not include regional holidays that vary by autonomous community (Catalonia, Madrid, Andalusia, etc.) — only nationally mandated holidays are returned.",
+      inputSchema: { year: z.number().describe("Calendar year as a 4-digit integer. Example: 2026") },
+      annotations: { title: "Get Spain Public Holidays", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
     },
     async ({ year }) => {
       const holidays = [
@@ -268,8 +268,8 @@ const createServer = () => {
   server.registerTool(
     "validate_siret",
     {
-      description: "Validates a French SIRET (Système d'Identification du Répertoire des Établissements) number using the official Luhn algorithm. SIRET is a 14-digit identifier assigned to each business establishment in France. The first 9 digits form the SIREN (company identifier) and the last 5 digits identify the specific establishment. Use this tool when processing French invoices, supplier registrations, B2B transactions, or any document requiring a valid French business establishment identifier. Returns whether the SIRET is valid, the SIREN extracted, and the establishment code.",
-      inputSchema: { siret: z.string().describe("The French SIRET to validate. Spaces and dashes are automatically removed. Example: '732 829 320 00074' or '73282932000074'") },
+      description: "Validates a French SIRET (Système d'Identification du Répertoire des Établissements) number using the official Luhn algorithm. SIRET is a 14-digit number — the first 9 digits are the SIREN (company identifier) and the last 5 digits identify the specific establishment. Returns { valid: boolean, siren: string, establishment: string, siret: string }. Use when processing French invoices (factures), validating supplier registrations, or any B2B transaction requiring a verified French business establishment identifier. Handles the La Poste special case automatically.",
+      inputSchema: { siret: z.string().describe("14-digit French SIRET, with or without spaces/dashes. Example: '732 829 320 00074' or '73282932000074'") },
       annotations: { title: "Validate French SIRET", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
     },
     async ({ siret }) => {
@@ -277,15 +277,11 @@ const createServer = () => {
       if (!/^\d{14}$/.test(clean)) {
         return { content: [{ type: "text", text: JSON.stringify({ valid: false, reason: "SIRET must have exactly 14 digits" }) }] };
       }
-
-      // Special case: La Poste SIRET (all digits sum must be divisible by 5)
       if (clean.startsWith("356000000")) {
         const sum = clean.split("").reduce((acc, d) => acc + parseInt(d), 0);
         const valid = sum % 5 === 0;
         return { content: [{ type: "text", text: JSON.stringify({ valid, siren: clean.substring(0, 9), establishment: clean.substring(9), siret: clean }) }] };
       }
-
-      // Standard Luhn algorithm
       let sum = 0;
       for (let i = 0; i < 14; i++) {
         let digit = parseInt(clean[i]);
@@ -306,29 +302,22 @@ const createServer = () => {
   server.registerTool(
     "validate_tva_fr",
     {
-      description: "Validates a French TVA (Taxe sur la Valeur Ajoutée) number, also known as French VAT number. The French TVA number consists of the prefix 'FR' followed by 2 alphanumeric characters and 9 digits (the SIREN). Use this tool when processing French invoices, validating supplier VAT numbers, or any cross-border EU transaction involving French companies. Returns whether the TVA number is valid, the SIREN extracted, and the key digits.",
-      inputSchema: { tva: z.string().describe("The French TVA number to validate. Spaces are automatically removed. Example: 'FR 40 303 265 045' or 'FR40303265045'") },
-      annotations: { title: "Validate French TVA Number", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+      description: "Validates a French TVA intracom (VAT) number — the EU VAT identifier for French companies. Format is 'FR' + 2 alphanumeric key characters + 9-digit SIREN. Returns { valid: boolean, key: string, siren: string, tva: string }. When the key is numeric, validates using the official formula: key = (12 + 3 × (SIREN mod 97)) mod 97. Use when validating French supplier VAT numbers, processing cross-border EU invoices, or any intra-EU transaction requiring a verified French VAT identifier.",
+      inputSchema: { tva: z.string().describe("French TVA intracom number with or without spaces. Example: 'FR 40 303 265 045' or 'FR40303265045'") },
+      annotations: { title: "Validate French TVA (VAT) Number", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
     },
     async ({ tva }) => {
       const clean = tva.replace(/\s/g, "").toUpperCase();
-
-      // Format: FR + 2 alphanumeric + 9 digits
       if (!/^FR[A-Z0-9]{2}\d{9}$/.test(clean)) {
         return { content: [{ type: "text", text: JSON.stringify({ valid: false, reason: "French TVA must start with FR followed by 2 alphanumeric characters and 9 digits. Example: FR40303265045" }) }] };
       }
-
       const key = clean.substring(2, 4);
       const siren = clean.substring(4);
-
-      // If key is numeric, validate using official formula: key = (12 + 3 * (SIREN % 97)) % 97
       if (/^\d{2}$/.test(key)) {
         const expectedKey = (12 + 3 * (parseInt(siren) % 97)) % 97;
         const valid = parseInt(key) === expectedKey;
         return { content: [{ type: "text", text: JSON.stringify({ valid, key, siren, tva: clean }) }] };
       }
-
-      // Alphanumeric key — format is valid but checksum not verifiable
       return { content: [{ type: "text", text: JSON.stringify({ valid: true, key, siren, tva: clean, note: "Alphanumeric key — format valid, checksum not applicable" }) }] };
     }
   );
@@ -337,12 +326,11 @@ const createServer = () => {
   server.registerTool(
     "get_france_holidays",
     {
-      description: "Returns French national public holidays for any given year. Use this tool when calculating delivery dates, scheduling appointments, computing working days, or any task requiring knowledge of non-working days in France. Returns all 11 national holidays with dates in YYYY-MM-DD format and names in both French and English. Note: Easter-dependent holidays (Easter Monday, Ascension, Whit Monday) are calculated for the given year.",
-      inputSchema: { year: z.number().describe("The year to get holidays for. Example: 2026") },
-      annotations: { title: "Get France Holidays", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
+      description: "Returns all French national public holidays for a given year as a structured list. Each holiday includes { date: 'YYYY-MM-DD', name: string, name_en: string }. Returns 11 mandatory holidays defined by French law. Easter-dependent holidays (Easter Monday, Ascension Thursday, Whit Monday) are dynamically calculated for the requested year using the Anonymous Gregorian algorithm. Use when calculating French business deadlines, delivery dates, or scheduling tasks that must avoid non-working days in France.",
+      inputSchema: { year: z.number().describe("Calendar year as a 4-digit integer. Example: 2026") },
+      annotations: { title: "Get France Public Holidays", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
     },
     async ({ year }) => {
-      // Calculate Easter Sunday using the Anonymous Gregorian algorithm
       const a = year % 19;
       const b = Math.floor(year / 100);
       const c = year % 100;
@@ -397,7 +385,7 @@ const httpServer = http.createServer(async (req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({
       name: "mcp-europe-tools",
-      version: "1.2.0",
+      version: "1.2.1",
       description: "European data tools for AI agents",
       tools: ["validate_nif", "validate_iban", "get_vat_rate", "get_portugal_holidays", "format_number_european", "validate_nif_es", "calculate_working_days", "get_spain_holidays", "validate_siret", "validate_tva_fr", "get_france_holidays"],
       mcp_endpoint: "/mcp"
