@@ -6,7 +6,7 @@ import http from "http";
 const createServer = () => {
   const server = new McpServer({
     name: "mcp-europe-tools",
-    version: "1.2.1",
+    version: "1.2.2",
     description: "Essential European data validation and formatting tools for AI agents working with Portuguese, Spanish, French and European business data. Covers NIF/NIE/CIF validation, SIRET/TVA validation, IBAN verification, VAT rates, public holidays and number formatting for 18+ European countries."
   });
 
@@ -14,7 +14,7 @@ const createServer = () => {
   server.registerTool(
     "validate_nif",
     {
-      description: "Validates a Portuguese NIF (Número de Identificação Fiscal) — the individual or company tax identification number issued by the Portuguese Tax Authority (AT). Uses the official modulo-11 checksum algorithm. Returns { valid: boolean, nif: string } on success, or { valid: false, reason: string } on format error. Use when processing Portuguese invoices (faturas), supplier onboarding, user registrations, or any compliance workflow requiring a verified Portuguese fiscal number. Does not query the AT database — validates format and checksum only.",
+      description: "Validates a Portuguese NIF (Número de Identificação Fiscal) — the 9-digit tax identification number issued by the Portuguese Tax Authority (AT) to individuals and companies. Applies the official modulo-11 checksum algorithm to verify the check digit. Returns { valid: true, nif: string } for valid NIFs, or { valid: false, reason: string } for invalid format or failed checksum. First-digit rules are enforced: 1–3 for individuals, 5 for corporations, 6 for public entities, 7–8 for other entities, 9 for occasional taxpayers. Use when processing Portuguese invoices (faturas), onboarding suppliers, validating user registrations, or any fiscal compliance workflow. Does not query the AT database — offline format and checksum validation only.",
       inputSchema: { nif: z.string().describe("9-digit Portuguese NIF, with or without spaces. Example: '123456789' or '123 456 789'") },
       annotations: { title: "Validate Portuguese NIF", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
     },
@@ -42,7 +42,7 @@ const createServer = () => {
   server.registerTool(
     "validate_iban",
     {
-      description: "Validates an IBAN (International Bank Account Number) using the official ISO 13616 MOD-97 algorithm. Supports all European IBANs including PT, ES, FR, DE, IT, NL, BE, PL, SE, DK, FI, AT, IE, GR, HU, RO, CZ, HR. Returns { valid: boolean, country: string, iban: string } — the country code is extracted from the first two characters. Use when processing bank transfers, validating supplier payment details, SEPA direct debits, or any financial document requiring a verified bank account number. Spaces in the input are automatically removed.",
+      description: "Validates an IBAN (International Bank Account Number) using the ISO 13616 MOD-97 algorithm. Supports 18 European countries: PT, ES, FR, DE, IT, NL, BE, PL, SE, DK, FI, AT, IE, GR, HU, RO, CZ, HR. Returns { valid: boolean, country: string, iban: string } — country is extracted from the 2-letter prefix. Returns { valid: false, reason: string } for malformed input. Spaces are automatically stripped before validation. Use when validating supplier bank details for SEPA transfers, processing direct debit mandates, verifying payment data in e-commerce checkouts, or any workflow requiring a verified EU bank account number. Validates structure and checksum only — does not confirm account existence.",
       inputSchema: { iban: z.string().describe("European IBAN with or without spaces. Example: 'PT50 0002 0123 1234 5678 9015 4' or 'PT50000201231234567890154'") },
       annotations: { title: "Validate IBAN", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
     },
@@ -67,7 +67,7 @@ const createServer = () => {
   server.registerTool(
     "get_vat_rate",
     {
-      description: "Returns all VAT (Value Added Tax) rates for a given EU country — standard, reduced, intermediate, and super-reduced rates where applicable. Returns { standard, reduced, intermediate?, superreduced?, country } with rates as percentages. Supports 18 EU countries: PT, ES, FR, DE, IT, NL, BE, PL, SE, DK, FI, AT, IE, GR, HU, RO, CZ, HR. Use when generating invoices, calculating cross-border EU prices, determining correct tax rates for e-commerce checkout, or any compliance workflow requiring accurate EU VAT rates.",
+      description: "Returns all VAT (Value Added Tax) rates for a given EU country — standard, reduced, intermediate, and super-reduced rates where applicable, as numeric percentages. Returns { country, standard, reduced?, intermediate?, superreduced? } for supported countries, or { error, available } listing all valid codes if the country is not found. Supports 18 EU member states: PT, ES, FR, DE, IT, NL, BE, PL, SE, DK, FI, AT, IE, GR, HU, RO, CZ, HR. Use when calculating EU cross-border invoice tax, determining correct rate for e-commerce checkout by customer country, generating compliant VAT breakdowns, or any workflow requiring accurate and current EU VAT rates per jurisdiction.",
       inputSchema: { country_code: z.string().describe("Two-letter ISO 3166-1 alpha-2 country code. Example: 'PT' for Portugal, 'FR' for France, 'DE' for Germany") },
       annotations: { title: "Get EU VAT Rate", readOnlyHint: true, idempotentHint: true, openWorldHint: false }
     },
@@ -385,7 +385,7 @@ const httpServer = http.createServer(async (req, res) => {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({
       name: "mcp-europe-tools",
-      version: "1.2.1",
+      version: "1.2.2",
       description: "European data tools for AI agents",
       tools: ["validate_nif", "validate_iban", "get_vat_rate", "get_portugal_holidays", "format_number_european", "validate_nif_es", "calculate_working_days", "get_spain_holidays", "validate_siret", "validate_tva_fr", "get_france_holidays"],
       mcp_endpoint: "/mcp"
