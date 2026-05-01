@@ -78,7 +78,7 @@ Portugal, Spain, France, Germany, Italy, Netherlands, Belgium, Poland, Sweden, D
 | Plan | Requests | Price |
 |------|----------|-------|
 | Free | 500/month | $0 — no credit card |
-| Pro | 5,000/month | $9/month or $86/year |
+| Pro | 10,000/month | $9/month or $86/year |
 | Overage | Beyond plan | $0.001/request |
 
 Available via [MCPize](https://mcpize.com).
