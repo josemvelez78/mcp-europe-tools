@@ -8,18 +8,17 @@ Essential European data validation and formatting tools for AI agents working wi
 ## Quickstart
 
 **Option 1 — MCPize (hosted, no setup):**
-```
-https://europe-tools.mcpize.run
-```
+
+https://mcpize.com/mcp/europe-tools
+
 Free tier: 500 requests/month, no credit card required. [Get your API key →](https://mcpize.com)
 
 **Option 2 — Smithery:**
-```bash
+
 smithery mcp add josemvelez/mcp-europe-tools
-```
 
 **Option 3 — Claude Desktop (direct endpoint):**
-```json
+
 {
   "mcpServers": {
     "mcp-europe-tools": {
@@ -27,7 +26,6 @@ smithery mcp add josemvelez/mcp-europe-tools
     }
   }
 }
-```
 
 ## What it does
 
