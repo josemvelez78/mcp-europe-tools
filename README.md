@@ -1,85 +1,57 @@
-# MCP Europe Tools
+# MCP Europe Business Suite
 
-[![Smithery badge](https://smithery.ai/badge/josemvelez/mcp-europe-tools)](https://smithery.ai/servers/josemvelez/mcp-europe-tools)
-[![Glama badge](https://glama.ai/mcp/servers/josemvelez78/mcp-europe-tools/badges/score.svg)](https://glama.ai/mcp/servers/josemvelez78/mcp-europe-tools)
+European business compliance suite for AI agents — **28 tools** covering tax ID validation, IBAN, VAT rates, e-invoicing rules, payment terms, and labor calendar helpers across **18+ European countries**.
 
-Essential European data validation and formatting tools for AI agents working with Portuguese, Spanish, French and European business data.
+Part of [MCPize](https://mcpize.com) — regional MCP servers for AI agents.
 
-## Quickstart
+## Coverage
 
-**Option 1 — MCPize (hosted, no setup):**
+| Module | Country coverage |
+|--------|-----------------|
+| **Tax IDs** | PT (NIF), ES (NIF/NIE/CIF), FR (SIRET, TVA), IT (Codice Fiscale, Partita IVA), DE (USt-IdNr), UK (VAT), NL (KVK) |
+| **IBAN** | 18 EU countries (PT, ES, FR, DE, IT, NL, BE, PL, SE, DK, FI, AT, IE, GR, HU, RO, CZ, HR) |
+| **VAT rates** | 19 countries (18 EU + UK) |
+| **Payment terms** | 10 countries (PT, ES, FR, DE, IT, NL, BE, UK, SE, PL) |
+| **E-invoicing** | 10 countries with timelines and formats |
+| **Holidays** | 8 countries with Easter-based moveable holidays |
+| **Postal codes** | 16 countries |
 
-https://mcpize.com/mcp/europe-tools
+## Tools (28 total)
 
-Free tier: 500 requests/month, no credit card required. [Get your API key →](https://mcpize.com)
+**Validation (17):** `validate_nif`, `validate_iban`, `get_vat_rate`, `get_portugal_holidays`, `get_spain_holidays`, `get_france_holidays`, `validate_nif_es`, `validate_siret`, `validate_tva_fr`, `calculate_working_days`, `format_number_european`, `validate_codice_fiscale`, `validate_partita_iva`, `validate_vat_de`, `validate_vat_uk`, `validate_kvk_nl`, `validate_postal_code`
 
-**Option 2 — Smithery:**
+**Business Rules (4):** `get_payment_terms`, `get_invoice_requirements`, `get_vat_exemption_threshold`, `get_einvoicing_rules`
 
-smithery mcp add josemvelez/mcp-europe-tools
+**Labor Helpers (3):** `get_public_holidays_range`, `calculate_working_days_eu`, `get_next_payment_date`
 
-**Option 3 — Claude Desktop (direct endpoint):**
+**Invoice & VAT (4):** `validate_invoice_schema`, `calculate_vat_breakdown`, `suggest_vat_treatment`, `calculate_vat_amount`
 
-{
-  "mcpServers": {
-    "mcp-europe-tools": {
-      "url": "https://mcp-europe-tools-production.up.railway.app/mcp"
-    }
-  }
-}
+## What's new in v1.2.0
 
-## What it does
+- Timezone-safe date formatting (no more UTC offset bugs)
+- Easter-based moveable holidays added to Portugal (Sexta-feira Santa) and Spain (Viernes Santo)
+- `nth_working_day` rule now correctly handles months without enough working days
+- Consistent `outputSchema` (Zod) on every tool — Smithery Typed Output ready
+- Refactored shared helpers (no duplicated Easter calculations across tools)
+- New `/health` endpoint for Railway/Docker healthchecks
 
-11 tools for European compliance workflows — validate tax IDs, verify IBANs, look up VAT rates, get public holidays, and format numbers for any European locale. No auth required. Read-only and idempotent.
+## Local development
 
-**Typical use cases:**
-- Validate invoices and tax IDs for EU customers (NIF, NIE, CIF, SIRET, TVA)
-- Verify IBANs before processing SEPA transfers or direct debits
-- Look up VAT rates for e-commerce checkout by customer country
-- Calculate payment deadlines excluding Portuguese public holidays
-- Format prices correctly for each European market
+```bash
+npm install
+npm start           # stdio transport (for Glama / Claude Desktop)
+npm run start:http  # HTTP transport on port 8080 (for Railway / hosted use)
+```
 
-## Tools
+## Endpoints (HTTP mode)
 
-### 🇵🇹 Portugal
-| Tool | Description |
-|------|-------------|
-| `validate_nif` | Validates Portuguese NIF using the official AT modulo-11 checksum |
-| `get_portugal_holidays` | Returns all 10 Portuguese national public holidays for any year |
-| `calculate_working_days` | Counts working days between two dates, excluding weekends and Portuguese holidays |
+- `GET /` — server metadata and tool list
+- `GET /health` — health check (returns `{"status":"ok"}`)
+- `POST /mcp` — MCP Streamable HTTP endpoint
 
-### 🇪🇸 Spain
-| Tool | Description |
-|------|-------------|
-| `validate_nif_es` | Validates Spanish NIF (citizens), NIE (foreign residents) and CIF (companies) |
-| `get_spain_holidays` | Returns all 9 Spanish national public holidays for any year |
+## Disclaimer
 
-### 🇫🇷 France
-| Tool | Description |
-|------|-------------|
-| `validate_siret` | Validates French SIRET (14-digit company establishment number) using Luhn |
-| `validate_tva_fr` | Validates French TVA intracom VAT number |
-| `get_france_holidays` | Returns all 11 French national public holidays, including Easter-dependent dates |
-
-### 🇪🇺 Europe (18 countries)
-| Tool | Description |
-|------|-------------|
-| `validate_iban` | Validates IBAN using ISO 13616 MOD-97 — supports PT, ES, FR, DE, IT, NL, BE, PL, SE, DK, FI, AT, IE, GR, HU, RO, CZ, HR |
-| `get_vat_rate` | Returns standard, reduced, intermediate and super-reduced VAT rates for 18 EU countries |
-| `format_number_european` | Formats numbers using the correct decimal/thousands separators for any European locale |
-
-## Supported Countries
-
-Portugal, Spain, France, Germany, Italy, Netherlands, Belgium, Poland, Sweden, Denmark, Finland, Austria, Ireland, Greece, Hungary, Romania, Czech Republic, Croatia.
-
-## Pricing
-
-| Plan | Requests | Price |
-|------|----------|-------|
-| Free | 500/month | $0 — no credit card |
-| Pro | 10,000/month | $9/month or $86/year |
-| Overage | Beyond plan | $0.001/request |
-
-Available via [MCPize](https://mcpize.com).
+All compliance, tax, and legal information returned by these tools is **reference only — not legal or tax advice**. VAT rates, e-invoicing rules, and holiday calendars change frequently. Always verify with the relevant tax authority and a qualified professional before use in production.
 
 ## License
 
