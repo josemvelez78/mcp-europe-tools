@@ -1,37 +1,16 @@
 {
-  "name": "mcp-europe-business",
-  "version": "1.2.0",
-  "description": "European business compliance suite for AI agents — validation, business rules, labor helpers and invoice/VAT tools for PT, ES, FR, DE, IT, UK, NL, BE and 11 more EU countries.",
-  "type": "module",
+  "name": "mcp-europe-tools",
+  "version": "1.0.0",
+  "description": "MCP Server with European data tools - NIF, IBAN, holidays, VAT rates",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "start:http": "MCP_HTTP=true node index.js"
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "engines": {
-    "node": ">=20.0.0"
-  },
-  "keywords": [
-    "mcp",
-    "model-context-protocol",
-    "europe",
-    "eu",
-    "tax",
-    "invoice",
-    "vat",
-    "iban",
-    "compliance",
-    "business",
-    "nif",
-    "vies",
-    "fintech",
-    "siret",
-    "codice-fiscale"
-  ],
-  "author": "MCPize",
-  "license": "MIT",
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "zod": "^3.22.0"
+    "node": ">=18.0.0"
   }
 }
